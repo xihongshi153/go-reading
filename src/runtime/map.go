@@ -64,12 +64,12 @@ import (
 const (
 	// Maximum number of key/elem pairs a bucket can hold.
 	bucketCntBits = 3
-	bucketCnt     = 1 << bucketCntBits
+	bucketCnt     = 1 << bucketCntBits // 一个桶持有的KV对
 
 	// Maximum average load of a bucket that triggers growth is 6.5.
 	// Represent as loadFactorNum/loadFactorDen, to allow integer math.
 	loadFactorNum = 13
-	loadFactorDen = 2
+	loadFactorDen = 2 // kvcnt/bucketcnt = loadFactor
 
 	// Maximum key or elem size to keep inline (instead of mallocing per element).
 	// Must fit in a uint8.
@@ -116,17 +116,17 @@ func isEmpty(x uint8) bool {
 type hmap struct {
 	// Note: the format of the hmap is also encoded in cmd/compile/internal/reflectdata/reflect.go.
 	// Make sure this stays in sync with the compiler's definition.
-	count     int // # live cells == size of map.  Must be first (used by len() builtin)
+	count     int // kvCnt # live cells == size of map.  Must be first (used by len() builtin)
 	flags     uint8
-	B         uint8  // log_2 of # of buckets (can hold up to loadFactor * 2^B items)
-	noverflow uint16 // approximate number of overflow buckets; see incrnoverflow for details
-	hash0     uint32 // hash seed
+	B         uint8  // 桶数的对数  log_2 of # of buckets (can hold up to loadFactor * 2^B items)
+	noverflow uint16 // 溢出桶的估计值 approximate number of overflow buckets; see incrnoverflow for details
+	hash0     uint32 // 哈希种子 hash seed
 
-	buckets    unsafe.Pointer // array of 2^B Buckets. may be nil if count==0.
-	oldbuckets unsafe.Pointer // previous bucket array of half the size, non-nil only when growing
-	nevacuate  uintptr        // progress counter for evacuation (buckets less than this have been evacuated)
+	buckets    unsafe.Pointer // 桶指针 在初始化的时候 生成的桶会大于2^B 多的部分是提前生成的溢出桶 array of 2^B Buckets. may be nil if count==0.
+	oldbuckets unsafe.Pointer // 扩容阶段的旧桶指针 previous bucket array of half the size, non-nil only when growing
+	nevacuate  uintptr        // 即将迁移的旧桶编号 小于的都迁移完了 progress counter for evacuation (buckets less than this have been evacuated)
 
-	extra *mapextra // optional fields
+	extra *mapextra // optional fields 溢出桶相关信息
 }
 
 // mapextra holds fields that are not present on all maps.
@@ -139,11 +139,11 @@ type mapextra struct {
 	// overflow contains overflow buckets for hmap.buckets.
 	// oldoverflow contains overflow buckets for hmap.oldbuckets.
 	// The indirection allows to store a pointer to the slice in hiter.
-	overflow    *[]*bmap
+	overflow    *[]*bmap // 已经使用的溢出桶
 	oldoverflow *[]*bmap
 
 	// nextOverflow holds a pointer to a free overflow bucket.
-	nextOverflow *bmap
+	nextOverflow *bmap // 下一个空闲溢出桶
 }
 
 // A bucket for a Go map.
@@ -151,7 +151,11 @@ type bmap struct {
 	// tophash generally contains the top byte of the hash value
 	// for each key in this bucket. If tophash[0] < minTopHash,
 	// tophash[0] is a bucket evacuation state instead.
-	tophash [bucketCnt]uint8
+	tophash [bucketCnt]uint8 // 8个字节 每个字节存储一个kv的哈希
+	// 添加的内容
+	// - 8个连续的KEY
+	// - 8个连续的VALUE
+	// - 一个指针 指向溢出桶 overflow
 	// Followed by bucketCnt keys and then bucketCnt elems.
 	// NOTE: packing all the keys together and then all the elems together makes the
 	// code a bit more complicated than alternating key/elem/key/elem/... but it allows
@@ -301,8 +305,10 @@ func makemap_small() *hmap {
 // can be created on the stack, h and/or bucket may be non-nil.
 // If h != nil, the map can be created directly in h.
 // If h.buckets != nil, bucket pointed to can be used as the first bucket.
+// 创建 参数分别是 类型
 func makemap(t *maptype, hint int, h *hmap) *hmap {
 	mem, overflow := math.MulUintptr(uintptr(hint), t.bucket.size)
+	// 判断是否超出限制
 	if overflow || mem > maxAlloc {
 		hint = 0
 	}
