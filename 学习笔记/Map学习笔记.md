@@ -18,4 +18,8 @@
 v     := hash[key] // => v     := *mapaccess1(maptype, hash, &key)
 v, ok := hash[key] // => v, ok := mapaccess2(maptype, hash, &key)
 ```
+> 读取 mapaccess1()与mapaccess2() 
 
+> 添加 mapassign
+
+> 删除 mapdelete

@@ -64,10 +64,11 @@ import (
 const (
 	// Maximum number of key/elem pairs a bucket can hold.
 	bucketCntBits = 3
-	bucketCnt     = 1 << bucketCntBits // 一个桶持有的KV对
+	bucketCnt     = 1 << bucketCntBits // 一个桶持有的KV对,一个桶最多为8个
 
 	// Maximum average load of a bucket that triggers growth is 6.5.
 	// Represent as loadFactorNum/loadFactorDen, to allow integer math.
+	// 13 / 2 = 6.5 负载因子的额度
 	loadFactorNum = 13
 	loadFactorDen = 2 // kvcnt/bucketcnt = loadFactor
 
@@ -75,6 +76,7 @@ const (
 	// Must fit in a uint8.
 	// Fast versions cannot handle big elems - the cutoff size for
 	// fast versions in cmd/compile/internal/gc/walk.go must be at most this elem.
+	// 一个桶8个key,8个val,都按两个字节计算, 8 * 16 = 128
 	maxKeySize  = 128
 	maxElemSize = 128
 
@@ -696,6 +698,7 @@ bucketloop:
 	}
 
 	// store new key/elem at insert position
+	// 如果值不是指针会转变为指针再存入bucket
 	if t.indirectkey() {
 		kmem := newobject(t.key)
 		*(*unsafe.Pointer)(insertk) = kmem
@@ -757,7 +760,7 @@ func mapdelete(t *maptype, h *hmap, key unsafe.Pointer) {
 	bOrig := b
 	top := tophash(hash)
 search:
-	for ; b != nil; b = b.overflow(t) {
+	for ; b != nil; b = b.overflow(t) { // 切换到下一个溢出桶
 		for i := uintptr(0); i < bucketCnt; i++ {
 			if b.tophash[i] != top {
 				if b.tophash[i] == emptyRest {
@@ -774,6 +777,7 @@ search:
 				continue
 			}
 			// Only clear key if there are pointers in it.
+			// 清空 key和val
 			if t.indirectkey() {
 				*(*unsafe.Pointer)(k) = nil
 			} else if t.key.ptrdata != 0 {
@@ -1324,6 +1328,7 @@ func reflect_makemap(t *maptype, cap int) *hmap {
 	if t.key.equal == nil {
 		throw("runtime.reflect_makemap: unsupported map key type")
 	}
+	// 如果
 	if t.key.size > maxKeySize && (!t.indirectkey() || t.keysize != uint8(goarch.PtrSize)) ||
 		t.key.size <= maxKeySize && (t.indirectkey() || t.keysize != uint8(t.key.size)) {
 		throw("key size wrong")
