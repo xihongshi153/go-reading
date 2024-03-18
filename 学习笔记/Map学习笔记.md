@@ -12,7 +12,10 @@
 |          | 3.nevacuate代表正要迁移的桶      |                                                              |
 |          | 4.hash>B&1==0,1 决定迁移到哪个桶 |                                                              |
 
+> 如何访问的 mapaccess1()与mapaccess2() 方法
 
-
-
+```go
+v     := hash[key] // => v     := *mapaccess1(maptype, hash, &key)
+v, ok := hash[key] // => v, ok := mapaccess2(maptype, hash, &key)
+```
 
